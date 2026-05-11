@@ -17,7 +17,7 @@ import type {
   ResumeRecord,
 } from "@/types";
 
-const STORAGE_KEY = "bibi-recruiter-workflow-v1";
+const STORAGE_KEY = "slate-recruiter-workflow-v1";
 
 type RecruitingState = {
   rawJD: string;

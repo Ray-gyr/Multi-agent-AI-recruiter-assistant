@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BIBI Recruiter Assistant",
+  title: "Slate Recruiter Assistant",
   description: "AI-powered recruiter workflow for criteria refinement and resume evaluation.",
 };
 

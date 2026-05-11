@@ -39,11 +39,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Link href="/upload-jd" className="flex items-center gap-3">
               <span className="grid size-10 place-items-center rounded-lg bg-emerald-600 text-sm font-black text-white">
-                BI
+                SL
               </span>
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                  BIBI
+                  Slate
                 </p>
                 <p className="text-lg font-semibold text-zinc-950">Recruiter Assistant</p>
               </div>
