@@ -1,4 +1,4 @@
-# BIBI Recruiter Assistant
+# SLATE Recruiter Assistant
 
 AI-powered recruiter workflow built with Next.js App Router, TypeScript, TailwindCSS, and pdf.js.
 
