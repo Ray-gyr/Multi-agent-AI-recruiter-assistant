@@ -62,6 +62,9 @@ Implementation Tips for the Summarizer
 1. Strict Logic: If a Must-have is missing, the candidate cannot be a "Strong Hire" or "Hire" regardless of other skills.
 2. Conflict Resolution: If the Team Lead says "Strong Hire" but HR says "No" due to a Red Flag, the Summarizer must default to No or Maybe and explain the conflict.
 3. Evidence-Based: Ensure the LLM cites specific chunks when justifying the "Maybe" or "No" categories.
+4. Experience Definition: Do not strictly assume current students have 0 professional experience. A current student can have 2+ years of professional work experience (e.g., internships, co-ops, prior full-time work).
+5. Current Date Awareness: Today's date is {currentDate}. Use this to accurately calculate graduation years, experience duration, and gap years.
+6. Timeline & Fact-checking: Actively audit the timeline of technologies claimed. Flag impossible anachronisms as Red Flags (e.g., claiming to use a framework like Next.js 14 or React 18 years before they were released).
 
 ${UNTRUSTED_INPUT_RULES}
 `;
@@ -98,6 +101,10 @@ Task:
 - role: Must strictly be "${role}".
 
 Note: Only highlight points relevant to your role. Keep outputs brief.
+Experience Definition: Do not strictly assume current students have 0 professional experience. A current student can have 2+ years of professional work experience.
+Current Date Awareness: Today's date is {currentDate}.
+Timeline & Fact-checking: Actively audit the timeline of technologies and experiences. Flag impossible anachronisms (e.g., using Next.js 14 in 2022) as "gap" (red flags).
+
 Strictly adhere to the provided JSON schema.
 
 ${UNTRUSTED_INPUT_RULES}
@@ -120,6 +127,10 @@ You are a Senior Review Panelist. Three independent agents (recruiter, hiringMan
 Your task is to:
 1. 'overview': Synthesize the viewpoints of the three agents into a unified, concise summary (2-3 sentences max).
 2. 'interviewQuestions': Identify any doubts, "unclear" tags, or "gap" tags raised by the agents, and formulate short, direct interview questions to address these concerns during an interview. Keep the questions brief.
+
+Guidelines:
+- Experience Definition: Do not strictly assume current students have 0 professional experience. A current student can have 2+ years of professional work experience.
+- Current Date Awareness: Today's date is {currentDate}.
 
 Strictly adhere to the provided JSON schema.
 
@@ -165,7 +176,8 @@ async function analyzeSingleResume(
   const response = await chain.invoke({
     criteria: JSON.stringify(criteria, null, 2),
     idealCandidateProfile,
-    resumeText: resume.text
+    resumeText: resume.text,
+    currentDate: new Date().toISOString().split('T')[0]
   });
 
   // Ensure the ID maps back to the frontend's provided ID
@@ -229,7 +241,11 @@ export async function analyzeCandidateDetail(input: Api3InputType): Promise<Api3
       HumanMessagePromptTemplate.fromTemplate(API3_AGENT_HUMAN_PROMPT)
     ]);
     const agentChain = agentPrompt.pipe(agentModel);
-    return agentChain.invoke({ criteria: criteriaJson, resumeText: input.resumeText });
+    return agentChain.invoke({ 
+      criteria: criteriaJson, 
+      resumeText: input.resumeText,
+      currentDate: new Date().toISOString().split('T')[0]
+    });
   });
 
   const agentResults = await Promise.all(agentPromises);
@@ -245,7 +261,8 @@ export async function analyzeCandidateDetail(input: Api3InputType): Promise<Api3
   ]);
   const summaryChain = summaryPrompt.pipe(summaryModel);
   const summaryResponse = await summaryChain.invoke({
-    agentComments: JSON.stringify(allComments, null, 2)
+    agentComments: JSON.stringify(allComments, null, 2),
+    currentDate: new Date().toISOString().split('T')[0]
   });
 
   return {

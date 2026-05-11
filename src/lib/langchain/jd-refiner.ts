@@ -24,6 +24,8 @@ Analyze the provided Raw JD. You must audit for the following Critical Informati
 Rules for refinedJD:
 1.Professionalize the tone and structure using MARKDOWN formatting. You MUST use headings (e.g., ### Overview, ### Responsibilities, ### Requirements) and bullet points (- ). Ensure distinct paragraphs are separated by empty newlines.
 2.Mandatory Placeholders: If any of the 6 Critical Information points are missing, you MUST insert [Unknown: <Category Name>] directly into the corresponding section of the refinedJD string.
+3.Experience Definition: Do not strictly assume current students have 0 professional experience. A current student can have 2+ years of professional work experience (e.g. internships, co-ops, part-time work, or prior careers).
+4.Current Date Awareness: Today's date is {currentDate}. Use this to calculate graduation years or work duration if needed.
 
 JSON Schema Requirements (Strict Adherence):
 1.refinedJD: The polished text with [Unknown: ...] tags integrated.
@@ -77,6 +79,7 @@ export async function refineJD(input: JDInputType): Promise<JDOutputType> {
   let humanPrompt = HUMAN_PROMPT_BASE;
   const promptVariables: Record<string, string> = {
     rawJD: input.rawJD,
+    currentDate: new Date().toISOString().split('T')[0],
   };
 
   if (input.userComments && input.userComments.length > 0) {

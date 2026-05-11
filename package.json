@@ -11,10 +11,12 @@
   "dependencies": {
     "@langchain/core": "^1.1.45",
     "@langchain/google-genai": "^2.1.30",
+    "@tailwindcss/typography": "^0.5.19",
     "next": "16.2.6",
     "pdfjs-dist": "5.4.149",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
