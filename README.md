@@ -15,7 +15,7 @@ AI-powered recruiter workflow built with Next.js App Router, TypeScript, Tailwin
 
 The frontend calls these endpoints through `src/lib/api.ts`:
 
-- `POST /api/refine-jd`
+- `POST /api/jd/refine`
 - `POST /api/analyze-resumes`
 - `POST /api/candidate-detail`
 
@@ -31,6 +31,17 @@ By default, requests are sent to the same origin. If the backend is hosted elsew
 ```bash
 NEXT_PUBLIC_API_BASE_URL=https://your-backend.example.com
 ```
+
+## Production Access Control
+
+Production deployments require Basic Auth before any app or API route is accessible:
+
+```bash
+BIBI_APP_USERNAME=slate
+BIBI_APP_PASSWORD=replace-with-a-long-random-password
+```
+
+If `BIBI_APP_PASSWORD` is missing in production, the app fails closed with `503`.
 
 For demos without a live backend, force deterministic mock responses:
 
