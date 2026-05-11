@@ -8,7 +8,6 @@ import {
   CandidateSummarySchema,
   Api3OutputSchema,
   CandidateSummaryType,
-  ChunkArraySchema,
   CommentArraySchema,
   CandidateDetailSummarySchema
 } from "./resume-schemas";

@@ -1,8 +1,5 @@
 "use client";
 
-type TextContentItem = {
-  str?: unknown;
-};
 
 export async function extractPdfText(file: File): Promise<string> {
   if (!isPdf(file)) {
@@ -26,7 +23,7 @@ export async function extractPdfText(file: File): Promise<string> {
       const page = await pdf.getPage(pageNumber);
       const content = await page.getTextContent();
       const pageText = content.items
-        .map((item: TextContentItem) => (typeof item.str === "string" ? item.str : ""))
+        .map((item: any) => (typeof item.str === "string" ? item.str : ""))
         .join(" ")
         .replace(/\s+/g, " ")
         .trim();

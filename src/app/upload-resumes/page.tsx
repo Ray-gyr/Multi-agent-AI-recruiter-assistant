@@ -168,6 +168,11 @@ export default function UploadResumesPage() {
       return;
     }
 
+    if (!criteria) {
+      setError("Criteria are not defined.");
+      return;
+    }
+
     setIsAnalyzing(true);
     setStageIndex(0);
 
