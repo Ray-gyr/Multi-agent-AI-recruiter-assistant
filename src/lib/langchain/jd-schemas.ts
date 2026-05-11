@@ -2,10 +2,11 @@ import { z } from "zod";
 
 export const JDInputSchema = z.object({
   rawJD: z.string().min(50, "Job description is too short to process.").max(10000, "Job description is too long."),
-  userComment: z.object({
+  previousRefinedJD: z.string().optional(),
+  userComments: z.array(z.object({
     selectedText: z.string().max(2000),
     instruction: z.string().max(1000)
-  }).optional()
+  })).optional()
 });
 
 export const JDOutputSchema = z.object({

@@ -1,10 +1,8 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from "@langchain/core/prompts";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { JDInputType, JDOutputSchema, JDOutputType } from "./jd-schemas";
 
-// System prompt space left for the LLM Base Prompt
-const SYSTEM_PROMPT = `
-Role:
+const SYSTEM_PROMPT = `Role:
 You are a Senior Technical Recruiter and HR Operations Analyst. Your mission is to transform fragmented "Raw JDs" into professional, high-fidelity job descriptions.
 
 Task:
@@ -17,8 +15,8 @@ Analyze the provided Raw JD. You must audit for the following Critical Informati
 6.Target Cohort (Specifically graduation year requirements for interns/new grads)
 
 Rules for refinedJD:
-1.Professionalize the tone and structure (Overview, Responsibilities, Requirements).
-2.Mandatory Placeholders: If any of the 6 Critical Information points are missing, you MUST insert [Unknown: <Category Name>] directly into the corresponding section of the refinedJD string. This allows the user to identify and fill gaps easily.
+1.Professionalize the tone and structure using MARKDOWN formatting. You MUST use headings (e.g., ### Overview, ### Responsibilities, ### Requirements) and bullet points (- ). Ensure distinct paragraphs are separated by empty newlines.
+2.Mandatory Placeholders: If any of the 6 Critical Information points are missing, you MUST insert [Unknown: <Category Name>] directly into the corresponding section of the refinedJD string.
 
 JSON Schema Requirements (Strict Adherence):
 1.refinedJD: The polished text with [Unknown: ...] tags integrated.
@@ -27,30 +25,31 @@ JSON Schema Requirements (Strict Adherence):
 4.redFlags: Warning signs (e.g., unrealistic expectations or vague stack).
 
 idealCandidateProfile: 2-3 sentences summarizing the "Perfect Fit" for calibration.
-Always return your response strictly matching the requested JSON schema.
-`;
+Always return your response strictly matching the requested JSON schema.`;
 
-// Human prompt base
 const HUMAN_PROMPT_BASE = `Here is the raw job description provided by the user:
 
 <raw_jd>
 {rawJD}
-</raw_jd>
-`;
+</raw_jd>`;
 
-// Human prompt for revisions
 const HUMAN_PROMPT_REVISION = `
-The user has reviewed a previous version of this job description and provided the following instruction for revision:
-<instruction>
-{instruction}
-</instruction>
 
-This instruction specifically targets or relates to the following text context from the previous version:
-<selected_text>
-{selectedText}
-</selected_text>
+The user has reviewed your previously refined version of this job description:
+<previous_refined_jd>
+{previousRefinedJD}
+</previous_refined_jd>
 
-Please incorporate this feedback, refine the JD accordingly, and regenerate all criteria based on the updated JD.`;
+The user provided the following feedback annotations for revision:
+<annotations>
+{instructions}
+</annotations>
+
+CRITICAL INSTRUCTIONS FOR REVISION:
+1. Incorporate the user's feedback into the previous version.
+2. You MUST retain the ENTIRE job description structure from the previous version (Overview, Responsibilities, Requirements). DO NOT delete sections that were not commented on.
+3. You MUST keep the output formatted using Markdown (use ### for headings, and - for bullet points). Ensure distinct paragraphs and lists are separated by empty newlines.
+4. Output the newly updated, full-length refined JD and criteria.`;
 
 export async function refineJD(input: JDInputType): Promise<JDOutputType> {
   const apiKey = process.env.GOOGLE_API_KEY;
@@ -58,14 +57,12 @@ export async function refineJD(input: JDInputType): Promise<JDOutputType> {
     throw new Error("GOOGLE_API_KEY is not defined in environment variables.");
   }
 
-  // Initialize the Gemini model via LangChain
   const model = new ChatGoogleGenerativeAI({
     model: "gemini-3-flash-preview",
-    temperature: 0.2, // Low temperature for more deterministic/structured output
+    temperature: 0.2,
     apiKey: apiKey,
   });
 
-  // Enforce structured output using Zod schema
   const structuredModel = model.withStructuredOutput(JDOutputSchema);
 
   let humanPrompt = HUMAN_PROMPT_BASE;
@@ -73,19 +70,22 @@ export async function refineJD(input: JDInputType): Promise<JDOutputType> {
     rawJD: input.rawJD,
   };
 
-  if (input.userComment && input.userComment.instruction) {
+  if (input.userComments && input.userComments.length > 0) {
     humanPrompt += HUMAN_PROMPT_REVISION;
-    promptVariables.instruction = input.userComment.instruction;
-    promptVariables.selectedText = input.userComment.selectedText || "";
+    promptVariables.previousRefinedJD = input.previousRefinedJD || "No previous version available.";
+    promptVariables.instructions = input.userComments
+      .map(
+        (c, i) =>
+          `[Annotation ${i + 1}]\nTarget Context: "${c.selectedText}"\nInstruction: "${c.instruction}"`
+      )
+      .join("\n\n");
   }
 
-  const prompt = ChatPromptTemplate.fromMessages([
-    SystemMessagePromptTemplate.fromTemplate(SYSTEM_PROMPT),
-    HumanMessagePromptTemplate.fromTemplate(humanPrompt)
-  ]);
+  const prompt = ChatPromptTemplate.fromTemplate(
+    SYSTEM_PROMPT + "\n\n" + humanPrompt
+  );
 
   const chain = prompt.pipe(structuredModel);
-
   const response = await chain.invoke(promptVariables);
 
   return response as JDOutputType;

@@ -1,11 +1,11 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from "@langchain/core/prompts";
-import { 
-  Api2InputType, 
-  Api2OutputType, 
-  Api3InputType, 
-  Api3OutputType, 
-  CandidateSummarySchema, 
+import {
+  Api2InputType,
+  Api2OutputType,
+  Api3InputType,
+  Api3OutputType,
+  CandidateSummarySchema,
   Api3OutputSchema,
   CandidateSummaryType,
   ChunkArraySchema,
@@ -17,17 +17,17 @@ import {
 async function runWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let index = 0;
-  
+
   const worker = async () => {
     while (index < items.length) {
       const currentIndex = index++;
       results[currentIndex] = await fn(items[currentIndex]);
     }
   };
-  
+
   const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
   await Promise.all(workers);
-  
+
   return results;
 }
 
@@ -45,9 +45,18 @@ Output Requirements:
 1. Name: Extract the candidate's full name.
 2. Tier: Assign one of ["Strong Hire", "Hire", "Maybe", "No"]. 
 3. Consensus: A brief summary of what all three roles agree on regarding the candidate.
-4. Conflicts: Explicitly state where the roles disagree (e.g., "recruiter likes the pedigree, but teamLead worries about lack of modern tech stack").
+4. Conflicts: Explicitly state where the roles disagree in 1 short sentence (e.g., "recruiter likes the pedigree, but teamLead worries about lack of modern tech stack"). If no conflicts, just say "None".
 
-Strictly adhere to the required JSON output schema.
+Tier explanation:
+1.Strong Hire: Exceptional match. Meets all Must-haves and the majority of Nice-to-haves. Demonstrates high technical maturity and zero red flags.
+2. Hire: Solid match. Meets all Must-haves. Possesses core competencies required for the role with minor gaps in non-essential "bonus" areas.
+3. Maybe: Borderline match. Meets core Must-haves but shows "Unclear" signals or minor Red Flags that require manual recruiter verification.
+No: Automatic rejection. Fails one or more Must-haves or triggers significant, non-negotiable Red Flags defined in the JD.
+
+Implementation Tips for the Summarizer
+1. Strict Logic: If a Must-have is missing, the candidate cannot be a "Strong Hire" or "Hire" regardless of other skills.
+2. Conflict Resolution: If the Team Lead says "Strong Hire" but HR says "No" due to a Red Flag, the Summarizer must default to No or Maybe and explain the conflict.
+3. Evidence-Based: Ensure the LLM cites specific chunks when justifying the "Maybe" or "No" categories.
 `;
 
 const API2_HUMAN_PROMPT = `
@@ -63,37 +72,22 @@ Candidate Resume:
 
 // --- Prompts for API 3 ---
 
-// Step 1: Universal Chunking
-const API3_CHUNKING_SYSTEM_PROMPT = `
-You are a precision document segmenter. Your only task is to break the provided resume into logical text chunks (e.g., bullet points, short paragraphs, or single sentences).
-
-Rules:
-- Extract exact substrings from the resume. Do not paraphrase or alter the text.
-- Assign a sequential integer id like 1, 2, 3 to each chunk.
-- Ensure the chunks collectively cover the most important sections of the resume.
-
-Strictly adhere to the provided JSON schema.
-`;
-
-const API3_CHUNKING_HUMAN_PROMPT = `
-Candidate Resume:
-{resumeText}
-`;
+// Step 1: Removed (Replaced by quote-based approach)
 
 // Step 2: Isolated Agent Prompts
 const getAgentPrompt = (role: string, focus: string) => `
 You are a(n) ${role}. Your focus is: ${focus}.
-You will be provided with a candidate's resume that has already been split into chunks (each with an integer ID), and the Job Description criteria.
+You will be provided with a candidate's full resume text, and the Job Description criteria.
 
 Task:
-- Review the provided chunks.
-- For chunks that contain notable information relevant to your focus, generate a comment.
+- Review the resume text.
+- For parts of the resume that contain notable information relevant to your focus, generate a concise comment.
 - type: "meets" (strong match), "unclear" (ambiguous), "gap" (missing or red flag).
-- text: The actual insight from your specific perspective.
-- chunkId: Must exactly match the integer id of the chunk being commented on.
+- text: The actual insight from your specific perspective. Be extremely concise and punchy (1-2 short sentences max).
+- quote: Extract the exact substring from the resume that this comment refers to. Do not paraphrase it.
 - role: Must strictly be "${role}".
 
-Note: Not all chunks need comments. Only highlight points relevant to your role.
+Note: Only highlight points relevant to your role. Keep outputs brief.
 Strictly adhere to the provided JSON schema.
 `;
 
@@ -101,8 +95,8 @@ const API3_AGENT_HUMAN_PROMPT = `
 JD Criteria:
 {criteria}
 
-Resume Chunks:
-{chunks}
+Resume Text:
+{resumeText}
 `;
 
 // Step 3: Summary LLM
@@ -110,8 +104,8 @@ const API3_SUMMARY_SYSTEM_PROMPT = `
 You are a Senior Review Panelist. Three independent agents (recruiter, hiringManager, teamLead) have just reviewed a candidate's resume and provided specific comments on various chunks of the text.
 
 Your task is to:
-1. 'overview': Synthesize the viewpoints of the three agents into a unified summary.
-2. 'interviewQuestions': Identify any doubts, "unclear" tags, or "gap" tags raised by the agents, and formulate specific interview questions to address these concerns during an interview.
+1. 'overview': Synthesize the viewpoints of the three agents into a unified, concise summary (2-3 sentences max).
+2. 'interviewQuestions': Identify any doubts, "unclear" tags, or "gap" tags raised by the agents, and formulate short, direct interview questions to address these concerns during an interview. Keep the questions brief.
 
 Strictly adhere to the provided JSON schema.
 `;
@@ -166,7 +160,7 @@ async function analyzeSingleResume(
 
 export async function analyzeResumesBatch(input: Api2InputType): Promise<Api2OutputType> {
   const CONCURRENCY_LIMIT = 10;
-  
+
   // Process all resumes through the single-pass panel prompt
   const results = await runWithConcurrency(
     input.resumes,
@@ -192,26 +186,13 @@ export async function analyzeResumesBatch(input: Api2InputType): Promise<Api2Out
 // --- API 3 Core Function ---
 
 export async function analyzeCandidateDetail(input: Api3InputType): Promise<Api3OutputType> {
-  
-  // Step 1: Chunk the resume text (Single LLM Call)
-  const chunkingModel = getModel(0.1).withStructuredOutput(ChunkArraySchema);
-  const chunkingPrompt = ChatPromptTemplate.fromMessages([
-    SystemMessagePromptTemplate.fromTemplate(API3_CHUNKING_SYSTEM_PROMPT),
-    HumanMessagePromptTemplate.fromTemplate(API3_CHUNKING_HUMAN_PROMPT)
-  ]);
-  
-  const chunkingChain = chunkingPrompt.pipe(chunkingModel);
-  const chunkingResponse = await chunkingChain.invoke({ resumeText: input.resumeText });
-  const chunks = chunkingResponse.chunks;
-  
-  const chunksJson = JSON.stringify(chunks, null, 2);
   const criteriaJson = JSON.stringify(input.criteria, null, 2);
 
   // Define the isolated roles
   const roles = [
-    { name: "recruiter", focus: "Keywords, STAR method, stability, education/background" },
-    { name: "hiringManager", focus: "Basic requirements, logistics, soft skills, budget alignment, cultural fit, compliance" },
-    { name: "teamLead", focus: "Technical depth, project complexity, system design, immediate project impact, tech stack match" }
+    { name: "recruiter", focus: "Keywords & Career Trajectory: Focus on keyword density, job stability (tenure), education prestige, and STAR method usage. Identify if the candidate is a safe bet." },
+    { name: "hiringManager", focus: "Logistics & Risk: Focus on location fit, work authorization (if mentioned), seniority level vs. budget, soft skills signals, and organizational Red Flags." },
+    { name: "teamLead", focus: "Technical Depth & Execution: Focus on the specific tech stack, complexity of projects, system design choices, and proof of work. Look for engineering maturity beyond just buzzwords." }
   ];
 
   // Step 2: Run isolated agents in parallel
@@ -222,11 +203,11 @@ export async function analyzeCandidateDetail(input: Api3InputType): Promise<Api3
       HumanMessagePromptTemplate.fromTemplate(API3_AGENT_HUMAN_PROMPT)
     ]);
     const agentChain = agentPrompt.pipe(agentModel);
-    return agentChain.invoke({ criteria: criteriaJson, chunks: chunksJson });
+    return agentChain.invoke({ criteria: criteriaJson, resumeText: input.resumeText });
   });
 
   const agentResults = await Promise.all(agentPromises);
-  
+
   // Combine all comments from the isolated agents
   const allComments = agentResults.flatMap(result => result.comments);
 
@@ -242,7 +223,6 @@ export async function analyzeCandidateDetail(input: Api3InputType): Promise<Api3
   });
 
   return {
-    chunks: chunks,
     comments: allComments,
     summary: summaryResponse
   };

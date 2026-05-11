@@ -41,13 +41,8 @@ export const Api3InputSchema = z.object({
   criteria: JDOutputSchema.shape.criteria
 });
 
-export const ChunkSchema = z.object({
-  id: z.number().int().describe("Sequential integer chunk ID, e.g., 1, 2, 3"),
-  text: z.string().describe("The exact text of the bullet point or sentence from the resume")
-});
-
 export const CommentSchema = z.object({
-  chunkId: z.number().int().describe("References the integer chunk id"),
+  quote: z.string().describe("The exact quote from the resume this comment refers to"),
   role: z.enum(["recruiter", "hiringManager", "teamLead"]),
   type: z.enum(["meets", "unclear", "gap"]),
   text: z.string().describe("The actual AI comment from the specific role's perspective")
@@ -59,13 +54,8 @@ export const CandidateDetailSummarySchema = z.object({
 });
 
 export const Api3OutputSchema = z.object({
-  chunks: z.array(ChunkSchema),
   comments: z.array(CommentSchema),
   summary: CandidateDetailSummarySchema
-});
-
-export const ChunkArraySchema = z.object({
-  chunks: z.array(ChunkSchema)
 });
 
 export const CommentArraySchema = z.object({
@@ -75,5 +65,4 @@ export const CommentArraySchema = z.object({
 // Types for API 3
 export type Api3InputType = z.infer<typeof Api3InputSchema>;
 export type Api3OutputType = z.infer<typeof Api3OutputSchema>;
-export type ChunkType = z.infer<typeof ChunkSchema>;
 export type CommentType = z.infer<typeof CommentSchema>;

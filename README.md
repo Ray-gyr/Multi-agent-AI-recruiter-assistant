@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BIBI Recruiter Assistant
 
-## Getting Started
+AI-powered recruiter workflow built with Next.js App Router, TypeScript, TailwindCSS, and pdf.js.
 
-First, run the development server:
+## What it does
+
+- Refines a rough job description into structured hiring criteria.
+- Lets recruiters edit and confirm must-haves, nice-to-haves, and red flags.
+- Extracts text from uploaded PDF resumes in the browser with pdf.js.
+- Caches extracted resume text in workflow state so PDFs are not reprocessed.
+- Sends cached resume text to the AI ranking API.
+- Displays ranked candidates and candidate-level multi-role feedback.
+
+## Backend APIs
+
+The frontend calls these endpoints through `src/lib/api.ts`:
+
+- `POST /api/refine-jd`
+- `POST /api/analyze-resumes`
+- `POST /api/candidate-detail`
+
+Current ID contract:
+
+- Candidate IDs are numbers.
+- Resume IDs sent to analysis are numbers so candidate drill-down can reuse cached resume text.
+- API 2 candidate summaries include `consensus` and `conflicts`; interview questions are not expected there.
+- API 3 accepts a numeric `candidateID`, returns numeric chunk IDs, numeric comment `chunkId` values, and a `summary` with `overview` plus `interviewQuestions`.
+
+By default, requests are sent to the same origin. If the backend is hosted elsewhere, set:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_API_BASE_URL=https://your-backend.example.com
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+For demos without a live backend, force deterministic mock responses:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+NEXT_PUBLIC_USE_MOCK_API=true npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Mock fallback is enabled by default for missing, timed-out, or unreachable APIs. Disable it with:
 
-## Learn More
+```bash
+NEXT_PUBLIC_ENABLE_MOCK_FALLBACK=false npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Run
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm install
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open `http://localhost:3000`.
 
-## Deploy on Vercel
+## Main Routes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `/upload-jd`
+- `/review-criteria`
+- `/upload-resumes`
+- `/results`
+- `/candidate/[id]`
