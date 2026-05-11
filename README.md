@@ -19,6 +19,13 @@ The frontend calls these endpoints through `src/lib/api.ts`:
 - `POST /api/analyze-resumes`
 - `POST /api/candidate-detail`
 
+Current ID contract:
+
+- Candidate IDs are numbers.
+- Resume IDs sent to analysis are numbers so candidate drill-down can reuse cached resume text.
+- API 2 candidate summaries include `consensus` and `conflicts`; interview questions are not expected there.
+- API 3 accepts a numeric `candidateID`, returns numeric chunk IDs, numeric comment `chunkId` values, and a `summary` with `overview` plus `interviewQuestions`.
+
 By default, requests are sent to the same origin. If the backend is hosted elsewhere, set:
 
 ```bash

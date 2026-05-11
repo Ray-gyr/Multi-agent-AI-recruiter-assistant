@@ -45,7 +45,7 @@ export default function UploadResumesPage() {
         .map((resume) => ({
           id: resume.id,
           filename: resume.filename,
-          text: resumeTexts[resume.id],
+          text: resumeTexts[String(resume.id)],
         }))
         .filter((resume) => Boolean(resume.text)),
     [resumeTexts, resumes],
@@ -135,7 +135,7 @@ export default function UploadResumesPage() {
       if (extracted.length > 0) {
         addResumes(
           extracted.map((item) => item.record),
-          Object.fromEntries(extracted.map((item) => [item.record.id, item.text])),
+          Object.fromEntries(extracted.map((item) => [String(item.record.id), item.text])),
         );
       }
 
@@ -278,19 +278,17 @@ export default function UploadResumesPage() {
   );
 }
 
-function createResumeId(filename: string): string {
-  const normalizedName = filename
-    .replace(/\.[^/.]+$/, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-  const randomId =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+function createResumeId(filename: string): number {
+  const filenameSeed = Array.from(filename).reduce(
+    (total, character) => total + character.charCodeAt(0),
+    0,
+  );
+  const randomSeed =
+    typeof crypto !== "undefined"
+      ? crypto.getRandomValues(new Uint32Array(1))[0]
+      : Math.floor(Math.random() * 1_000_000);
 
-  return `${normalizedName || "resume"}-${randomId}`;
+  return Date.now() + filenameSeed + randomSeed;
 }
 
 function countWords(text: string): number {

@@ -40,10 +40,10 @@ type RecruitingContextValue = RecruitingState & {
   }) => void;
   updateCriteria: (criteria: Criteria) => void;
   addResumes: (resumes: ResumeRecord[], resumeTexts: Record<string, string>) => void;
-  removeResume: (resumeId: string) => void;
+  removeResume: (resumeId: number) => void;
   setCandidates: (candidates: Candidate[]) => void;
   setCandidateDetail: (
-    candidateId: string,
+    candidateId: number,
     detail: CandidateDetailResponse | CandidateDetail,
   ) => void;
   resetWorkflow: () => void;
@@ -66,11 +66,11 @@ type Action =
       resumes: ResumeRecord[];
       resumeTexts: Record<string, string>;
     }
-  | { type: "removeResume"; resumeId: string }
+  | { type: "removeResume"; resumeId: number }
   | { type: "setCandidates"; candidates: Candidate[] }
   | {
       type: "setCandidateDetail";
-      candidateId: string;
+      candidateId: number;
       detail: CandidateDetailResponse | CandidateDetail;
     }
   | { type: "reset" };
@@ -137,7 +137,7 @@ export function RecruitingProvider({ children }: { children: React.ReactNode }) 
   );
 
   const removeResume = useCallback(
-    (resumeId: string) => dispatch({ type: "removeResume", resumeId }),
+    (resumeId: number) => dispatch({ type: "removeResume", resumeId }),
     [],
   );
 
@@ -147,7 +147,7 @@ export function RecruitingProvider({ children }: { children: React.ReactNode }) 
   );
 
   const setCandidateDetail = useCallback(
-    (candidateId: string, detail: CandidateDetailResponse | CandidateDetail) =>
+    (candidateId: number, detail: CandidateDetailResponse | CandidateDetail) =>
       dispatch({ type: "setCandidateDetail", candidateId, detail }),
     [],
   );
@@ -230,7 +230,7 @@ function recruitingReducer(state: RecruitingState, action: Action): RecruitingSt
       };
     case "removeResume": {
       const remainingTexts = Object.fromEntries(
-        Object.entries(state.resumeTexts).filter(([id]) => id !== action.resumeId),
+        Object.entries(state.resumeTexts).filter(([id]) => id !== String(action.resumeId)),
       );
 
       return {
@@ -243,7 +243,7 @@ function recruitingReducer(state: RecruitingState, action: Action): RecruitingSt
             ? null
             : state.selectedCandidateDetail,
         candidateDetails: Object.fromEntries(
-          Object.entries(state.candidateDetails).filter(([id]) => id !== action.resumeId),
+          Object.entries(state.candidateDetails).filter(([id]) => id !== String(action.resumeId)),
         ),
       };
     }
@@ -265,7 +265,7 @@ function recruitingReducer(state: RecruitingState, action: Action): RecruitingSt
         selectedCandidateDetail: detail,
         candidateDetails: {
           ...state.candidateDetails,
-          [action.candidateId]: detail,
+          [String(action.candidateId)]: detail,
         },
       };
     }
@@ -284,12 +284,32 @@ function normalizeState(state: Partial<RecruitingState>): RecruitingState {
     resumeTexts: state.resumeTexts ?? {},
     resumes: (state.resumes ?? []).map((resume) => ({
       ...resume,
+      id: normalizeNumericId(resume.id),
       fileSize: resume.fileSize ?? 0,
     })),
-    candidates: state.candidates ?? [],
+    candidates: (state.candidates ?? []).map((candidate) => ({
+      ...candidate,
+      id: normalizeNumericId(candidate.id),
+    })),
     selectedCandidateDetail: state.selectedCandidateDetail ?? null,
     candidateDetails: state.candidateDetails ?? {},
   };
+}
+
+function normalizeNumericId(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return Date.now();
 }
 
 function loadPersistedState(): Partial<RecruitingState> | null {

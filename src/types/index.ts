@@ -23,13 +23,13 @@ export type RefineJDResponse = {
 };
 
 export type ResumeInput = {
-  id: string;
+  id: number;
   filename: string;
   text: string;
 };
 
 export type ResumeRecord = {
-  id: string;
+  id: number;
   filename: string;
   uploadedAt: string;
   wordCount: number;
@@ -41,11 +41,10 @@ export type CandidateTier = "Strong Hire" | "Hire" | "Maybe" | "No";
 export type CandidateSummary = {
   consensus: string;
   conflicts: string;
-  interviewQuestions: string[];
 };
 
 export type Candidate = {
-  id: string;
+  id: number;
   name: string;
   tier: CandidateTier;
   summary: CandidateSummary;
@@ -62,13 +61,13 @@ export type AnalyzeResumesResponse = {
 };
 
 export type CandidateDetailRequest = {
-  candidateId: string;
+  candidateID: number;
   resumeText: string;
   criteria: Criteria;
 };
 
 export type ResumeChunk = {
-  id: string;
+  id: number;
   text: string;
 };
 
@@ -77,17 +76,23 @@ export type CandidateCommentRole = "recruiter" | "hiringManager" | "teamLead";
 export type CandidateCommentType = "meets" | "unclear" | "gap";
 
 export type CandidateComment = {
-  chunkId: string;
+  chunkId: number;
   role: CandidateCommentRole;
   type: CandidateCommentType;
   text: string;
 };
 
+export type CandidateDetailSummary = {
+  overview: string;
+  interviewQuestions: string[];
+};
+
 export type CandidateDetailResponse = {
   chunks: ResumeChunk[];
   comments: CandidateComment[];
+  summary: CandidateDetailSummary;
 };
 
 export type CandidateDetail = CandidateDetailResponse & {
-  candidateId: string;
+  candidateId: number;
 };

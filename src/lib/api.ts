@@ -216,11 +216,6 @@ function mockAnalyzeResumes(payload: AnalyzeResumesRequest): AnalyzeResumesRespo
           score.redFlagHits > 0
             ? "The resume has relevant signals, but potential red flags need recruiter follow-up."
             : "Reviewer perspectives are aligned; no major conflicts surfaced in the resume text.",
-        interviewQuestions: [
-          "Which project best demonstrates ownership from ambiguity to measurable outcome?",
-          "What tradeoff would you make if speed, quality, and stakeholder alignment were in tension?",
-          "How would you measure success in the first 90 days for this role?",
-        ],
       },
     } satisfies Candidate;
   });
@@ -263,6 +258,15 @@ function mockCandidateDetail(payload: CandidateDetailRequest): CandidateDetailRe
           : "The technical/team signal is reasonable, but the interview should still verify collaboration and execution details.",
       },
     ]),
+    summary: {
+      overview:
+        "The detailed review compares resume evidence against the approved criteria and highlights where recruiter, hiring manager, and tech lead perspectives need follow-up.",
+      interviewQuestions: [
+        "Which project best demonstrates ownership from ambiguity to measurable outcome?",
+        "What tradeoff would you make if speed, quality, and stakeholder alignment were in tension?",
+        "How would you measure success in the first 90 days for this role?",
+      ],
+    },
   };
 }
 
@@ -385,7 +389,7 @@ function chunkResume(text: string): ResumeChunk[] {
   const source = paragraphs.length >= 3 ? paragraphs : splitIntoWordChunks(text, 120);
 
   return source.slice(0, 6).map((chunk, index) => ({
-    id: `chunk-${index + 1}`,
+    id: index + 1,
     text: chunk,
   }));
 }

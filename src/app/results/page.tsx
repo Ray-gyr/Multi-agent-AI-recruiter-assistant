@@ -21,10 +21,6 @@ export default function ResultsPage() {
       candidate.tier === "No" ||
       !candidate.summary.conflicts.toLowerCase().includes("no major"),
   ).length;
-  const interviewQuestionCount = candidates.reduce(
-    (total, candidate) => total + candidate.summary.interviewQuestions.length,
-    0,
-  );
 
   if (candidates.length === 0) {
     return (
@@ -82,9 +78,9 @@ export default function ResultsPage() {
           detail="Candidates needing extra recruiter validation"
         />
         <OutcomeCard
-          label="Interview prompts"
-          value={interviewQuestionCount.toString()}
-          detail="AI-generated questions ready for screening"
+          label="Detail reviews"
+          value={candidates.length.toString()}
+          detail="Profiles ready for role feedback and questions"
         />
       </section>
 
