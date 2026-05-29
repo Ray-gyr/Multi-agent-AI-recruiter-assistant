@@ -1,4 +1,5 @@
-# Slate *Built at [BIBI] · Presented at Google*
+# Slate 
+*Built at [BIBI] · Presented at Google*
 
 > *A slate isn't a list of applicants. It's a list of people worth hiring.*
 
