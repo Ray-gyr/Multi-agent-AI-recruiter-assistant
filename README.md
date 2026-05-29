@@ -1,4 +1,4 @@
-# Slate
+# Slate *Built at [BIBI] · Presented at Google*
 
 > *A slate isn't a list of applicants. It's a list of people worth hiring.*
 
@@ -113,6 +113,3 @@ BIBI_APP_PASSWORD=replace-with-a-long-random-password
 ```
 
 If `BIBI_APP_PASSWORD` is missing or shorter than 16 characters in production, the app fails closed with `503`.
-
-
-*Built at [BIBI] · Presented at Google*
