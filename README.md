@@ -118,3 +118,12 @@ BIBI_APP_PASSWORD=replace-with-a-long-random-password
 ```
 
 If `BIBI_APP_PASSWORD` is missing or shorter than 16 characters in production, the app fails closed with `503`.
+
+## Contributors
+
+This project was built by:
+
+| Avatar | Contributor | Role |
+| :---: | :---: | :--- |
+| <img src="https://github.com/Ray-gyr.png" width="50" alt="Ray Gan avatar" /> | **Ray Gan** | Backend Architecture, AI Agents Orchestration |
+| <img src="https://github.com/evanhuangdev.png" width="50" alt="Evan Huang avatar" /> | **Evan Huang** | Frontend Development, UI/UX Design |
