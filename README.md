@@ -125,5 +125,5 @@ This project was built by:
 
 | Avatar | Contributor | Role |
 | :---: | :---: | :--- |
-| <img src="https://github.com/Ray-gyr.png" width="50px;" alt="Ray Gan avatar" /> | **Ray Gan** | Backend Architecture, AI Agents Orchestration |
-| <img src="https://github.com/evenhuangdev.png" width="50px;" alt="Evan Huang avatar" /> | **Evan Huang** | Frontend Development, UI/UX Design |
+| <img src="https://github.com/Ray-gyr.png" width="50" alt="Ray Gan avatar" /> | **Ray Gan** | Backend Architecture, AI Agents Orchestration |
+| <img src="https://github.com/evanhuangdev.png" width="50" alt="Evan Huang avatar" /> | **Evan Huang** | Frontend Development, UI/UX Design |
