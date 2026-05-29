@@ -14,7 +14,7 @@ const steps = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { criteria, resumes, candidates, resetWorkflow, rawJD } = useRecruitingStore();
+  const { criteria, resumes, candidates, resetWorkflow, rawJD, criteriaConfirmed } = useRecruitingStore();
   const hasWorkflowState = Boolean(criteria) || resumes.length > 0 || candidates.length > 0 || Boolean(rawJD);
 
   function handleStartOver() {
@@ -74,11 +74,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 (pathname?.startsWith("/candidate/") && step.href === "/results");
               const complete = isStepComplete(index, {
                 hasCriteria: Boolean(criteria),
+                criteriaConfirmed: criteriaConfirmed,
                 hasResumes: resumes.length > 0,
                 hasCandidates: candidates.length > 0,
               });
 
-              const isLocked = index > 0 && !rawJD;
+              const isLocked =
+                index === 1
+                  ? !rawJD
+                  : index === 2
+                    ? !criteriaConfirmed
+                    : index === 3
+                      ? resumes.length === 0
+                      : false;
 
               return (
                 <Link
@@ -91,7 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     active
                       ? "border-emerald-700 bg-emerald-700 text-white shadow-sm"
                       : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50",
-                    isLocked ? "pointer-events-none opacity-50" : ""
+                    isLocked ? "pointer-events-none opacity-50 cursor-not-allowed" : ""
                   ].join(" ")}
                 >
                   <span
@@ -122,14 +130,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 function isStepComplete(
   index: number,
-  state: { hasCriteria: boolean; hasResumes: boolean; hasCandidates: boolean },
+  state: {
+    hasCriteria: boolean;
+    criteriaConfirmed: boolean;
+    hasResumes: boolean;
+    hasCandidates: boolean;
+  },
 ) {
   if (index === 0) {
     return state.hasCriteria;
   }
 
   if (index === 1) {
-    return state.hasCriteria;
+    return state.criteriaConfirmed;
   }
 
   if (index === 2) {

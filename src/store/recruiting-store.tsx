@@ -28,6 +28,7 @@ type RecruitingState = {
   candidates: Candidate[];
   selectedCandidateDetail: CandidateDetail | null;
   candidateDetails: Record<string, CandidateDetail>;
+  criteriaConfirmed: boolean;
 };
 
 type RecruitingContextValue = RecruitingState & {
@@ -36,6 +37,7 @@ type RecruitingContextValue = RecruitingState & {
     refinedJD: string;
     criteria: Criteria;
     idealCandidateProfile: string;
+    criteriaConfirmed?: boolean;
   }) => void;
   updateCriteria: (criteria: Criteria) => void;
   addResumes: (resumes: ResumeRecord[], resumeTexts: Record<string, string>) => void;
@@ -56,6 +58,7 @@ type Action =
         refinedJD: string;
         criteria: Criteria;
         idealCandidateProfile: string;
+        criteriaConfirmed?: boolean;
       };
     }
   | { type: "updateCriteria"; criteria: Criteria }
@@ -83,6 +86,7 @@ const initialState: RecruitingState = {
   candidates: [],
   selectedCandidateDetail: null,
   candidateDetails: {},
+  criteriaConfirmed: false,
 };
 
 const RecruitingContext = createContext<RecruitingContextValue | null>(null);
@@ -181,6 +185,7 @@ function recruitingReducer(state: RecruitingState, action: Action): RecruitingSt
         refinedJD: action.payload.refinedJD,
         criteria: action.payload.criteria,
         idealCandidateProfile: action.payload.idealCandidateProfile,
+        criteriaConfirmed: action.payload.criteriaConfirmed ?? false,
         candidates: [],
         selectedCandidateDetail: null,
         candidateDetails: {},
@@ -189,6 +194,7 @@ function recruitingReducer(state: RecruitingState, action: Action): RecruitingSt
       return {
         ...state,
         criteria: action.criteria,
+        criteriaConfirmed: true,
         candidates: [],
         selectedCandidateDetail: null,
         candidateDetails: {},

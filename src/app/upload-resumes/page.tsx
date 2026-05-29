@@ -11,7 +11,7 @@ import { analyzeResumes } from "@/lib/api";
 import { extractPdfText } from "@/lib/pdf";
 import { sleep } from "@/lib/sleep";
 import { useRecruitingStore } from "@/store/recruiting-store";
-import type { ResumeInput, ResumeRecord } from "@/types";
+import type { ResumeInput, ResumeRecord, Criteria } from "@/types";
 
 const MAX_RESUME_BYTES = 10 * 1024 * 1024;
 const extractionStages = [
@@ -21,22 +21,67 @@ const extractionStages = [
   "Ready for AI evaluation",
 ];
 
+const DEFAULT_REFINED_JD = `### Overview
+TechFlow Solutions is seeking a dynamic and agile Full Stack Developer Intern to join our high-impact Growth Team. In this role, you will be responsible for developing and optimizing our main platform with a primary focus on user acquisition, retention, and scaling. We are looking for a developer who thrives in a fast-paced environment and is comfortable iterating quickly to drive business results.
+
+### Responsibilities
+- Design, develop, and maintain full-stack features using React and Node.js.
+- Collaborate with the Growth Team to implement experiments and features aimed at increasing the user base.
+- Manage and optimize relational databases using PostgreSQL.
+- Deploy and manage services within the AWS cloud environment.
+- Troubleshoot complex technical issues and provide scalable solutions.
+
+### Requirements
+- **Experience Level**: Minimum of 2+ years of professional software development experience (including internships, co-ops, or prior professional roles).
+- **Core Tech Stack**: Proficiency in React, Node.js, and PostgreSQL.
+- **Cloud Services**: Hands-on experience with AWS.
+- **Location**: Remote.
+- **Employment Type**: Intern.
+- **Target Cohort**: Expected graduation in 2027.
+- **Compensation**: $25 - $30 per hour.
+- Strong problem-solving skills and the ability to work effectively within a collaborative team environment.
+- Proven ability to move quickly and deliver high-quality code in a growth-oriented setting.`;
+
+const DEFAULT_IDEAL_PROFILE = "A dynamic and agile full-stack engineering intern with 2+ years of experience, proficient in React, Node.js, and PostgreSQL, graduating in 2027, who can work remotely and deploy to AWS.";
+
+const DEFAULT_CRITERIA: Criteria = {
+  mustHave: [
+    "2+ years of professional software development experience (including internships, co-ops, or prior professional roles)",
+    "Proficiency in React, Node.js, and PostgreSQL",
+    "Expected graduation in 2027 (Internship eligibility)",
+    "Ability to work remote"
+  ],
+  nice2Have: [
+    "Hands-on experience with AWS cloud services",
+    "Experience in growth teams or rapid experimentation (user acquisition/retention)",
+    "Strong problem-solving and collaboration skills"
+  ],
+  redFlags: [
+    "Graduation year before 2027 (not eligible for the internship cohort)",
+    "Strictly seeking full-time roles instead of an internship",
+    "No experience with React or Node.js"
+  ]
+};
+
 export default function UploadResumesPage() {
   const router = useRouter();
   const {
     criteria,
+    criteriaConfirmed,
     idealCandidateProfile,
     resumeTexts,
     resumes,
     addResumes,
     removeResume,
     setCandidates,
+    setJobRefinement,
   } = useRecruitingStore();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [stageIndex, setStageIndex] = useState(0);
+  const [isInitializing, setIsInitializing] = useState(!criteriaConfirmed);
 
   const isBusy = isExtracting || isAnalyzing;
   const uploadedResumeInputs = useMemo<ResumeInput[]>(
@@ -52,6 +97,21 @@ export default function UploadResumesPage() {
   );
 
   useEffect(() => {
+    if (!criteria && !criteriaConfirmed) {
+      setJobRefinement({
+        rawJD: "Default TechFlow JD",
+        refinedJD: DEFAULT_REFINED_JD,
+        idealCandidateProfile: DEFAULT_IDEAL_PROFILE,
+        criteria: DEFAULT_CRITERIA,
+        criteriaConfirmed: true,
+      });
+      setIsInitializing(false);
+    } else {
+      setIsInitializing(false);
+    }
+  }, [criteria, criteriaConfirmed, setJobRefinement]);
+
+  useEffect(() => {
     if (!isBusy) {
       return;
     }
@@ -63,15 +123,23 @@ export default function UploadResumesPage() {
     return () => clearInterval(timer);
   }, [isBusy]);
 
-  if (!criteria) {
-    return (
-      <EmptyState
-        title="Criteria are required first"
-        description="Confirm the hiring rubric before uploading resumes so every candidate is evaluated against the same criteria."
-        actionHref="/review-criteria"
-        actionLabel="Review criteria"
-      />
-    );
+  async function injectMockResume(filename: string) {
+    setError("");
+    setNotice("");
+    setIsExtracting(true);
+    setStageIndex(0);
+    try {
+      const response = await fetch(`/${encodeURIComponent(filename)}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch mock resume: ${filename}`);
+      }
+      const blob = await response.blob();
+      const file = new File([blob], filename, { type: "application/pdf" });
+      await handleFilesAccepted([file]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to inject mock resume.");
+      setIsExtracting(false);
+    }
   }
 
   async function handleFilesAccepted(files: File[]) {
@@ -204,6 +272,25 @@ export default function UploadResumesPage() {
     }
   }
 
+  if (isInitializing) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-zinc-500 animate-pulse">Initializing default workflow...</div>
+      </div>
+    );
+  }
+
+  if (!criteriaConfirmed) {
+    return (
+      <EmptyState
+        title="Hiring criteria not confirmed yet"
+        description="Please confirm your hiring headlines and rubric in Step 2 before uploading and analyzing resumes."
+        actionHref="/review-criteria"
+        actionLabel="Review criteria"
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -234,6 +321,34 @@ export default function UploadResumesPage() {
           {notice}
         </div>
       ) : null}
+
+      {/* Sample Resumes Card */}
+      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-zinc-950 flex items-center gap-1.5">
+          <span>💡</span> Try with Demo Sample Resumes
+        </h2>
+        <p className="mt-1 text-xs leading-5 text-zinc-600">
+          Click a sample below to automatically fetch and inject it into the candidate list.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={() => injectMockResume("Mock CV_bad.pdf")}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50/50 px-4 text-xs font-semibold text-red-700 transition hover:bg-red-50 hover:text-red-800 disabled:opacity-50"
+          >
+            <span>📄</span> Inject Mock CV_bad.pdf
+          </button>
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={() => injectMockResume("Mock CV_medium.pdf")}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-4 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 hover:text-amber-800 disabled:opacity-50"
+          >
+            <span>📄</span> Inject Mock CV_medium.pdf
+          </button>
+        </div>
+      </section>
 
       <ResumeDropzone
         disabled={isBusy}

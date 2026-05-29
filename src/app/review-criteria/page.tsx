@@ -1,8 +1,7 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CriteriaEditor } from "@/components/CriteriaEditor";
 import { EmptyState } from "@/components/EmptyState";
@@ -36,6 +35,30 @@ export default function ReviewCriteriaPage() {
   const [draftInstruction, setDraftInstruction] = useState("");
   const [isRefining, setIsRefining] = useState(false);
 
+  // Ref and State for Demo
+  const jdContainerRef = useRef<HTMLDivElement | null>(null);
+  const [demoState, setDemoState] = useState<{
+    isRunning: boolean;
+    step: 'none' | 'find-unknown' | 'scroll-to-text' | 'move-to-text' | 'selecting' | 'typing' | 'move-to-add' | 'completed';
+    cursorX: number;
+    cursorY: number;
+    cursorVisible: boolean;
+    tooltipText: string;
+  }>({
+    isRunning: false,
+    step: 'none',
+    cursorX: 0,
+    cursorY: 0,
+    cursorVisible: false,
+    tooltipText: '',
+  });
+
+  useEffect(() => {
+    return () => {
+      window.getSelection()?.removeAllRanges();
+    };
+  }, []);
+
   if (!criteria || !rawJD) {
     return (
       <EmptyState
@@ -64,6 +87,7 @@ export default function ReviewCriteriaPage() {
   }
 
   function captureSelection() {
+    if (demoState.isRunning) return; // Prevent user interaction during demo
     const selection = window.getSelection()?.toString().trim();
     if (selection) {
       setActiveSelection(selection);
@@ -119,6 +143,235 @@ export default function ReviewCriteriaPage() {
     }
   }
 
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  function findBracketedTextNode(container: HTMLElement) {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let node;
+    const regex = /\[Unknown:[^\]]+\]/i;
+    
+    while ((node = walker.nextNode())) {
+      const text = node.nodeValue || "";
+      const match = text.match(regex);
+      if (match && match.index !== undefined) {
+        return {
+          node,
+          text: match[0],
+          index: match.index,
+        };
+      }
+    }
+    
+    // Fallback: search for any bracketed text
+    walker.currentNode = container; // reset walker
+    const fallbackRegex = /\[[^\]]+\]/;
+    while ((node = walker.nextNode())) {
+      const text = node.nodeValue || "";
+      const match = text.match(fallbackRegex);
+      if (match && match.index !== undefined) {
+        return {
+          node,
+          text: match[0],
+          index: match.index,
+        };
+      }
+    }
+
+    // Double fallback: search for "React", "Node.js", or "PostgreSQL"
+    const words = ["React", "Node.js", "PostgreSQL", "Full Stack", "Solutions"];
+    for (const word of words) {
+      walker.currentNode = container; // reset
+      while ((node = walker.nextNode())) {
+        const text = node.nodeValue || "";
+        const index = text.toLowerCase().indexOf(word.toLowerCase());
+        if (index !== -1) {
+          return {
+            node,
+            text: text.substring(index, index + word.length),
+            index,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  async function startDemo() {
+    if (!jdContainerRef.current) return;
+    
+    // Clear selection and comments to avoid conflicts
+    window.getSelection()?.removeAllRanges();
+    setActiveSelection("");
+    setDraftInstruction("");
+    
+    // Initialize demo state at center of the viewport
+    setDemoState({
+      isRunning: true,
+      step: 'find-unknown',
+      cursorX: window.innerWidth / 2,
+      cursorY: window.innerHeight / 2,
+      cursorVisible: true,
+      tooltipText: "Let's find some missing info to refine...",
+    });
+    
+    await sleep(1500);
+
+    const target = findBracketedTextNode(jdContainerRef.current);
+    if (!target) {
+      setDemoState(prev => ({
+        ...prev,
+        tooltipText: "No text found to annotate. Highlight manually instead!",
+        step: 'completed',
+      }));
+      await sleep(2000);
+      setDemoState(prev => ({ ...prev, isRunning: false, cursorVisible: false }));
+      return;
+    }
+
+    // Scroll target into view if needed
+    target.node.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await sleep(800);
+
+    // Create a temporary range to find the layout coordinates of the text
+    const range = document.createRange();
+    range.setStart(target.node, target.index);
+    range.setEnd(target.node, target.index + target.text.length);
+    
+    const rects = range.getClientRects();
+    const rect = rects[0] || range.getBoundingClientRect();
+    
+    const startX = rect.left;
+    const startY = rect.top + rect.height / 2;
+    const endX = rect.right;
+    const endY = rect.top + rect.height / 2;
+
+    // Move cursor to start of text
+    setDemoState(prev => ({
+      ...prev,
+      step: 'move-to-text',
+      cursorX: startX - 10,
+      cursorY: startY,
+      tooltipText: `First, let's highlight this part: "${target.text}"`,
+    }));
+
+    await sleep(1200);
+
+    // Drag to select
+    setDemoState(prev => ({
+      ...prev,
+      step: 'selecting',
+      cursorX: endX,
+      cursorY: endY,
+      tooltipText: `Selecting text...`,
+    }));
+
+    const selection = window.getSelection();
+    if (selection) {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    setActiveSelection(target.text);
+
+    await sleep(1500);
+
+    // Find annotation box
+    const inputElement = document.querySelector('textarea[placeholder*="What should be changed?"]') as HTMLTextAreaElement;
+    let inputRect = { left: window.innerWidth - 300, top: 400 };
+    if (inputElement) {
+      const r = inputElement.getBoundingClientRect();
+      inputRect = { left: r.left + 30, top: r.top + 30 };
+    }
+
+    setDemoState(prev => ({
+      ...prev,
+      step: 'typing',
+      cursorX: inputRect.left,
+      cursorY: inputRect.top,
+      tooltipText: "Now, let's write our instruction in the feedback box.",
+    }));
+
+    await sleep(1200);
+
+    if (inputElement) {
+      inputElement.focus();
+    }
+
+    const cleanText = target.text.replace(/\[Unknown:\s*/i, "").replace(/[\[\]]/g, "").trim();
+    const cleanLower = cleanText.toLowerCase();
+    let mockDetail = "required.";
+    if (cleanLower.includes("cohort")) mockDetail = "2026/2027 graduates.";
+    else if (cleanLower.includes("compensation") || cleanLower.includes("salary")) mockDetail = "$100k - $130k USD.";
+    else if (cleanLower.includes("location")) mockDetail = "Remote (US/Canada).";
+    else if (cleanLower.includes("employment")) mockDetail = "Full-time.";
+    else if (cleanLower.includes("tech") || cleanLower.includes("stack") || cleanLower.includes("stack")) mockDetail = "React and Node.js.";
+    else if (cleanLower.includes("experience")) mockDetail = "2+ years.";
+
+    const instructionText = `Explain that ${cleanText} is ${mockDetail}`;
+    for (let i = 1; i <= instructionText.length; i++) {
+      setDraftInstruction(instructionText.slice(0, i));
+      await sleep(40);
+    }
+
+    await sleep(800);
+
+    // Find the Add Comment button
+    let buttonRect = { left: window.innerWidth - 300, top: 550 };
+    const buttons = document.querySelectorAll('button');
+    let addButton: HTMLButtonElement | null = null;
+    for (const btn of Array.from(buttons)) {
+      if (btn.textContent?.includes('Add Comment')) {
+        addButton = btn;
+        const r = btn.getBoundingClientRect();
+        buttonRect = { left: r.left + r.width / 2, top: r.top + r.height / 2 };
+        break;
+      }
+    }
+
+    setDemoState(prev => ({
+      ...prev,
+      step: 'move-to-add',
+      cursorX: buttonRect.left,
+      cursorY: buttonRect.top,
+      tooltipText: "Clicking 'Add Comment'...",
+    }));
+
+    await sleep(1200);
+
+    if (addButton) {
+      // Simulate click visual effect
+      addButton.classList.add('scale-95', 'opacity-80');
+      await sleep(150);
+      addButton.classList.remove('scale-95', 'opacity-80');
+    }
+
+    // Add comment
+    setComments(prev => [
+      ...prev,
+      { selectedText: target.text, instruction: instructionText }
+    ]);
+    
+    // Clear draft selection
+    setDraftInstruction("");
+    setActiveSelection("");
+    window.getSelection()?.removeAllRanges();
+
+    setDemoState(prev => ({
+      ...prev,
+      step: 'completed',
+      cursorVisible: false,
+      tooltipText: "Annotation added! You can add more, then click 'Refine with comments'!",
+    }));
+
+    await sleep(3000);
+
+    setDemoState(prev => ({
+      ...prev,
+      isRunning: false,
+      step: 'none',
+    }));
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -139,12 +392,41 @@ export default function ReviewCriteriaPage() {
 
       {error ? <ErrorBanner message={error} /> : null}
 
+      {/* Feature Highlighting & Demo Banner */}
+      <div className="relative overflow-hidden rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm ring-4 ring-emerald-100">
+              💡
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-emerald-950">
+                Refine Specific Parts with Highlighting
+              </h3>
+              <p className="mt-0.5 text-xs leading-5 text-emerald-800">
+                Notice any missing information or placeholders like <code className="rounded bg-emerald-100 px-1 font-mono text-xs font-bold text-emerald-900 border border-emerald-200">[Unknown: ...]</code>? 
+                Simply drag-select any text in the <strong>Refined Job Description</strong> to add custom feedback annotations and re-refine instantly!
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={demoState.isRunning}
+            onClick={startDemo}
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-white px-3.5 text-xs font-semibold text-emerald-700 shadow-sm border border-emerald-200 transition hover:bg-emerald-50 hover:text-emerald-800 active:scale-95 disabled:opacity-50"
+          >
+            <span className="text-sm">🎥</span> Watch Demo Animation
+          </button>
+        </div>
+      </div>
+
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* Left Column */}
         <div className="space-y-6">
           <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-zinc-950">Refined Job Description</h2>
             <div
+              ref={jdContainerRef}
               className="mt-3 text-sm text-zinc-700 selection:bg-emerald-200 selection:text-emerald-900 cursor-text"
               onMouseUp={captureSelection}
             >
@@ -219,7 +501,7 @@ export default function ReviewCriteriaPage() {
             {comments.length > 0 && (
               <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto">
                 {comments.map((comment, index) => (
-                  <div key={index} className="relative rounded-lg bg-zinc-50 p-3 pr-8 border border-zinc-100">
+                  <div key={index} className="relative rounded-lg bg-zinc-50 p-3 pr-8 border border-zinc-100 animate-[pulse_1s_ease-in-out_1]">
                     <p className="text-xs leading-5 text-zinc-500 italic line-clamp-2">
                       &ldquo;{comment.selectedText}&rdquo;
                     </p>
@@ -258,6 +540,74 @@ export default function ReviewCriteriaPage() {
           </div>
         </aside>
       </section>
+
+      {/* Simulated cursor layer */}
+      {demoState.isRunning && demoState.cursorVisible && (
+        <div
+          style={{
+            position: 'fixed',
+            left: demoState.cursorX,
+            top: demoState.cursorY,
+            transform: 'translate(-4px, -4px)',
+            transition: demoState.step === 'selecting' 
+              ? 'left 1200ms linear, top 1200ms linear' 
+              : 'left 1000ms cubic-bezier(0.25, 0.8, 0.25, 1), top 1000ms cubic-bezier(0.25, 0.8, 0.25, 1)',
+            zIndex: 9999,
+            pointerEvents: 'none',
+          }}
+          className="flex flex-col items-start"
+        >
+          {/* Cursor SVG */}
+          <svg
+            className="h-6 w-6 text-emerald-600 drop-shadow-md filter"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path d="M4.5 3v15.2l4.3-4.3 3 7.2 2.8-1.2-3-7.2h6.4L4.5 3z" />
+          </svg>
+          
+          {/* Tooltip bubble next to the cursor */}
+          <div 
+            style={{
+              transition: 'opacity 300ms ease-in-out',
+              opacity: demoState.tooltipText ? 1 : 0,
+            }}
+            className="ml-4 mt-2 max-w-xs rounded-lg border border-emerald-100 bg-white p-2.5 text-xs font-semibold text-emerald-950 shadow-lg ring-1 ring-black/5 whitespace-nowrap"
+          >
+            <span className="mr-1">💡</span>
+            {demoState.tooltipText}
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Demo overlay button */}
+      {demoState.isRunning && (
+        <div className="fixed bottom-6 left-1/2 z-[9990] -translate-x-1/2 rounded-full border border-zinc-200 bg-white/95 px-4 py-2 shadow-lg backdrop-blur-sm flex items-center gap-3">
+          <span className="flex h-2 w-2 rounded-full bg-emerald-600 animate-ping" />
+          <span className="text-xs font-semibold text-zinc-950">
+            Playing Demo: {demoState.tooltipText || "Simulating interactive selection..."}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setDemoState({
+                isRunning: false,
+                step: 'none',
+                cursorX: 0,
+                cursorY: 0,
+                cursorVisible: false,
+                tooltipText: '',
+              });
+              setActiveSelection("");
+              setDraftInstruction("");
+              window.getSelection()?.removeAllRanges();
+            }}
+            className="rounded-full bg-zinc-100 px-2.5 py-1 text-[10px] font-bold text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900 transition"
+          >
+            Stop Demo
+          </button>
+        </div>
+      )}
     </div>
   );
 }
